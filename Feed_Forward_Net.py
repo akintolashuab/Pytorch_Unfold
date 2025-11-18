@@ -5,6 +5,7 @@ import torchvision
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
+import torch.nn.functional as F
 import sys
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
@@ -104,20 +105,36 @@ for epoch in range(num_epochs):
         
 
 # %%
+# testing loop
+preds = []
+labels= []
 with torch.no_grad():
     n_correct = 0
     n_samples = 0
-    for images, labels in test_loader:
+    for images, labels_1 in test_loader:
         images = images.reshape(-1, 28*28).to(device)
-        labels = labels.to(device)
+        labels_1 = labels_1.to(device)
         outputs = model(images)
         
         #max returns (value ,index)
         _, predicted = torch.max(outputs, 1)
-        n_samples += labels.size(0)
-        n_correct += (predicted == labels).sum().item()
+        n_samples += labels_1.size(0)
+        n_correct += (predicted == labels_1).sum().item()
+
+        labels.append(predicted)
+        class_prediction = [F.softmax(output, dim=0) for output in outputs]
+        preds.append(class_prediction)
+
+    pred = torch.cat([torch.stack(batch) for batch in preds])
+    label = torch.cat(labels)
     
     acc = 100.0 * n_correct / n_samples
     print(f'Accuracy of the network on the 10000 test images: {acc} %')
 
+    classes = range(10)
+    for i in classes:
+        labels_i = label==i
+        pred_i = pred[:,i]
+        writer.add_pr_curve(str(i), labels_i, pred_i, global_step=0)
+        writer.close()
 # %%
