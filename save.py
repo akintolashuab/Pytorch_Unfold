@@ -61,3 +61,13 @@ checkpoint = {
 }
 torch.save(checkpoint, 'my_checkpoint.pth')
 # %%
+loaded_checkpoint = torch.load('my_checkpoint.pth')
+model = Model(6)
+model.load_state_dict(loaded_checkpoint['model_state_dict'])
+optimizer = torch.optim.SGD(model.parameters(), lr=0)
+optimizer.load_state_dict(loaded_checkpoint['optimizer_state_dict'])
+epoch = loaded_checkpoint['epoch']
+print(epoch)
+print(model.state_dict())
+print(optimizer.state_dict())
+# %%
