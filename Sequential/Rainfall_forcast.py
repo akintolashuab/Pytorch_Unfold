@@ -41,7 +41,7 @@ batch_size = 32  # Batch size for training
 # and split the data such that data before split_date is used for training
 dataset_train = WeatherDataset(df_data,
          day_range=day_range, split_date=split_date, train_test="train")
-# %%
+ # %%
 dataset_train
 # %%
 x, y = dataset_train[1]
@@ -212,7 +212,7 @@ training_loss_logger = []
 for epoch in trange(nepochs, desc="Epochs"):
     weather_rnn.train()
 
-    for x_batch, y_batch in data_loader_train:
+    for i, (x_batch, y_batch) in enumerate(data_loader_train):
 
         x_batch = x_batch.to(device)   # (B, 14, 5)
         y_batch = y_batch.to(device).unsqueeze(1)  # (B,1)
