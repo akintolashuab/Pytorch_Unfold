@@ -7,6 +7,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset, TensorDataset
 import torchvision
 from lightning.pytorch import Trainer
+import matplotlib.pyplot as plt
 
 # %%
 class LSTMFromScratch(pl.LightningModule):
@@ -277,7 +278,7 @@ print("Company A: Observed = 0, Predicted =", model(torch.tensor([0., 0.5, 0.25,
 print("Company B: Observed = 1, Predicted =", model(torch.tensor([1., 0.5, 0.25, 1.])).detach())
 
 # %%
-trainer = pl.Trainer(max_epochs=300, log_every_n_steps=2)
+trainer = pl.Trainer(max_epochs=400, log_every_n_steps=2)
 
 trainer.fit(model, train_dataloaders=dataloader)
 
@@ -289,6 +290,7 @@ print("\nNow let's compare the observed and predicted values...")
 print("Company A: Observed = 0, Predicted =", model(torch.tensor([0., 0.5, 0.25, 1.])).detach())
 print("Company B: Observed = 1, Predicted =", model(torch.tensor([1., 0.5, 0.25, 1.])).detach())
 # %%
+
 plt.figure(figsize=(8,5))
 
 plt.plot(model.train_losses)
@@ -300,3 +302,229 @@ plt.title("Training Loss Curve")
 plt.grid(True)
 
 plt.show()
+# %%
+# %%
+import torch
+import torch.nn as nn
+import pytorch_lightning as pl
+import matplotlib.pyplot as plt
+
+from torch.optim import Adam
+
+
+class LightningLSTM(pl.LightningModule):
+
+    def __init__(self):
+
+        # Initialize parent class
+        super().__init__()
+
+        pl.seed_everything(seed=42)
+
+        # Store losses for plotting
+        self.train_losses = []
+
+        ##################################################
+        # LSTM SETTINGS
+        ##################################################
+        # input_size = 1 because each timestep contains
+        # only one feature/value
+        #
+        # hidden_size = 3 means the LSTM will learn
+        # 3 hidden features at every timestep
+        ##################################################
+
+        self.lstm = nn.LSTM(
+            input_size=1,
+            hidden_size=3
+        )
+
+        ##################################################
+        # Since hidden_size=3, the LSTM output dimension
+        # becomes 3.
+        #
+        # We therefore need a Linear layer to convert
+        # the 3 outputs into 1 final prediction.
+        ##################################################
+
+        self.fc = nn.Linear(in_features=3, out_features=1)
+
+    def forward(self, input):
+
+        ##################################################
+        # Reshape input
+        #
+        # Example:
+        # [0., 0.5, 0.25, 1.]
+        #
+        # becomes:
+        # [[0.00],
+        #  [0.50],
+        #  [0.25],
+        #  [1.00]]
+        ##################################################
+
+        input_trans = input.view(len(input), 1)
+
+        ##################################################
+        # Run through LSTM
+        ##################################################
+
+        lstm_out, (hidden_state, cell_state) = self.lstm(input_trans)
+
+        ##################################################
+        # Get last timestep output
+        #
+        # Shape before:
+        # [3]
+        ##################################################
+
+        last_output = lstm_out[-1]
+
+        ##################################################
+        # Pass through Linear layer
+        #
+        # Shape:
+        # 3 -> 1
+        ##################################################
+
+        prediction = self.fc(last_output)
+
+        return prediction
+
+    def configure_optimizers(self):
+
+        return Adam(self.parameters(), lr=0.1)
+
+    def training_step(self, batch, batch_idx):
+
+        ##################################################
+        # Get batch data
+        ##################################################
+
+        input_i, label_i = batch
+
+        ##################################################
+        # Forward pass
+        ##################################################
+
+        output_i = self.forward(input_i[0])
+
+        ##################################################
+        # Compute loss
+        ##################################################
+
+        loss = (output_i - label_i) ** 2
+
+        ##################################################
+        # Convert tensor to scalar
+        ##################################################
+
+        loss_value = loss.item()
+
+        ##################################################
+        # Save loss for plotting
+        ##################################################
+
+        self.train_losses.append(loss_value)
+
+        ##################################################
+        # Logging
+        ##################################################
+
+        self.log("train_loss", loss)
+
+        if label_i == 0:
+            self.log("out_0", output_i)
+        else:
+            self.log("out_1", output_i)
+
+        return loss
+
+
+# %%
+# Create model
+model = LightningLSTM()
+
+##################################################
+# Print parameters BEFORE training
+##################################################
+
+print("Before optimization, the parameters are...")
+
+for name, param in model.named_parameters():
+    print(name, param.data)
+
+##################################################
+# Initial predictions
+##################################################
+
+print("\nNow let's compare the observed and predicted values...")
+
+print(
+    "Company A: Observed = 0, Predicted =",
+    model(torch.tensor([0., 0.5, 0.25, 1.])).detach()
+)
+
+print(
+    "Company B: Observed = 1, Predicted =",
+    model(torch.tensor([1., 0.5, 0.25, 1.])).detach()
+)
+
+# %%
+##################################################
+# Train model
+##################################################
+
+trainer = pl.Trainer(
+    max_epochs=400,
+    log_every_n_steps=2
+)
+
+trainer.fit(model, train_dataloaders=dataloader)
+
+# %%
+##################################################
+# Print parameters AFTER training
+##################################################
+
+print("After optimization, the parameters are...")
+
+for name, param in model.named_parameters():
+    print(name, param.data)
+
+##################################################
+# Final predictions
+##################################################
+
+print("\nNow let's compare the observed and predicted values...")
+
+print(
+    "Company A: Observed = 0, Predicted =",
+    model(torch.tensor([0., 0.5, 0.25, 1.])).detach()
+)
+
+print(
+    "Company B: Observed = 1, Predicted =",
+    model(torch.tensor([1., 0.5, 0.25, 1.])).detach()
+)
+
+# %%
+##################################################
+# Plot training loss
+##################################################
+
+plt.figure(figsize=(8, 5))
+
+plt.plot(model.train_losses)
+
+plt.xlabel("Training Step")
+plt.ylabel("Loss")
+
+plt.title("Training Loss Curve")
+
+plt.grid(True)
+
+plt.show()
+
+# %%
